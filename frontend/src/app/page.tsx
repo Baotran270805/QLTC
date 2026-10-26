@@ -10,7 +10,7 @@ type Task = {
 };
 
 const STORAGE_KEY = 'azure-mini-tasks-api-url';
-const PAGE_VERSION = 'Phiên bản 1.0'; // LAB: đổi thành 'Phiên bản 2.0' rồi git push.
+const PAGE_VERSION = 'Phiên bản 2.0'; // LAB: đổi thành 'Phiên bản 2.0' rồi git push.
 
 function normaliseUrl(value: string) {
   return value.trim().replace(/\/+$/, '');
