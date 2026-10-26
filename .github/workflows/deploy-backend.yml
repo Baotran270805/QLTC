@@ -1,0 +1,60 @@
+# Backend CI/CD for the backend/ subfolder of this monorepo.
+# Configure these BEFORE clicking Run workflow:
+#   GitHub Actions VARIABLE: AZURE_WEBAPP_NAME
+#   GitHub Actions SECRETS: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID
+#   Azure App Service setting: SCM_DO_BUILD_DURING_DEPLOYMENT=true
+# Authenticate using an Azure user-assigned managed identity with GitHub OIDC (no password).
+name: Deploy NestJS Backend to Azure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    # On the first push, Azure has not been configured; avoid a misleading failed run.
+    if: ${{ vars.AZURE_WEBAPP_NAME != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+
+      - name: Validate backend build
+        working-directory: backend
+        run: |
+          npm install
+          npm run build
+
+      - name: Create clean deployment source folder
+        run: |
+          mkdir -p deploy-backend
+          cp backend/package.json deploy-backend/
+          if [ -f backend/package-lock.json ]; then cp backend/package-lock.json deploy-backend/; fi
+          cp backend/nest-cli.json backend/tsconfig.json backend/tsconfig.build.json deploy-backend/
+          cp -R backend/src backend/prisma deploy-backend/
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy backend source to Azure App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          package: ./deploy-backend
